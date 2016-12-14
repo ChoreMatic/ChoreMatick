@@ -34,8 +34,10 @@ GetChoreListIntent Tell me the list of chores
 
 ConfirmChoreIntent Confirm {password}
 
-AddChoreIntent Add a {chore} for {choreDate}
-AddChoreIntent Create a {chore} for {choreDate}
+AddChoreIntent Add a chore {chore} for {choreDate}
+AddChoreIntent Create a chore {chore} for {choreDate}
+AddChoreIntent Add the chore {chore} for {choreDate}
+AddChoreIntent Create the chore {chore} for {choreDate}
 
 NumberOfCompletedChoresIntent How many chores are completed
 NumberOfCompletedChoresIntent How many chores are done

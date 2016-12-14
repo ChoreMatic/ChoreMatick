@@ -148,7 +148,6 @@ public class ChorematickSpeechlet implements Speechlet {
         speech.setText("It's your lucky day! you have no assigned chores.");
     }
 
-
     SimpleCard card = new SimpleCard();
     card.setTitle("Chore requested");
     card.setContent("Your child just asked for today's chore");
@@ -229,7 +228,7 @@ public class ChorematickSpeechlet implements Speechlet {
 
     SimpleCard card = new SimpleCard();
     card.setTitle("ChoreMatick Tips!");
-    card.setContent("You can tell me to add a chore by saying, for example, 'Add mow the lawn for Tuesday'. \n  You can ask me 'What is my chore for today?'. \n You can tell me that you have finished the lawn by saying 'I am done with mow the lawn for today'. \n You can confirm that your child has completed their chore by providing the given password e.g 'Confirm 1234'. \n  You can also ask me for a 'Full list of chores', and 'The total number of chores that are completed'.");
+    card.setContent("You can tell me to add a chore by saying, for example, 'Add mow the lawn for Tuesday'. \n  You can ask me 'What is my chore for today?'. \n You can tell me that you have finished the chore by saying 'I am done with mow the lawn for today'. \n You can confirm that your child has completed their chore by providing the given password e.g 'Confirm 1234'. \n  You can also ask me for a 'Full list of chores', and 'The total number of chores that are completed'.");
 
     return SpeechletResponse.newAskResponse(speech, reprompt, card);
   }
@@ -266,10 +265,19 @@ public class ChorematickSpeechlet implements Speechlet {
       this.mapper.save(task);
       speech.setText("I've confirmed "+ task.getDate() + " " + task.getChore() +" chore is completed.");
     } else {
-      speech.setText("Unable to confirm password, please try again.");
+      speech.setText("Is there anything else I can help you with today?");
     }
 
-    return SpeechletResponse.newTellResponse(speech);
+    Reprompt reprompt = new Reprompt();
+    PlainTextOutputSpeech repromptSpeech = new PlainTextOutputSpeech();
+    repromptSpeech.setText("Please try confirming the password again");
+    reprompt.setOutputSpeech(repromptSpeech);
+
+    SimpleCard card = new SimpleCard();
+    card.setTitle("Chore Completed!");
+    card.setContent("Thank you for confiming your child has completed their chore; the list has been updated");
+
+    return SpeechletResponse.newAskResponse(speech, reprompt, card);
   }
 
   private SpeechletResponse getNumberOfCompletedChoresResponse(){
