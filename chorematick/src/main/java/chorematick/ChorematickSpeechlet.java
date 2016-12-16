@@ -12,7 +12,6 @@ import com.amazon.speech.ui.Image;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
-import com.amazonaws.services.dynamodbv2.document.DynamoDB;
 import com.amazonaws.services.dynamodbv2.document.Item;
 import com.amazonaws.services.dynamodbv2.document.ItemCollection;
 import com.amazonaws.services.dynamodbv2.document.ScanOutcome;
@@ -22,9 +21,7 @@ import com.amazonaws.services.dynamodbv2.document.utils.NameMap;
 import com.amazonaws.services.dynamodbv2.document.utils.ValueMap;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
-import com.amazonaws.services.dynamodbv2.datamodeling.PaginatedList;
 
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -42,12 +39,11 @@ public class ChorematickSpeechlet implements Speechlet {
 
   private  AmazonDynamoDBClient client;
 
-  private DynamoDBMapper mapper;
-  private DynamoDB dynamoDB;
+  private Dao dao;
 
-  public ChorematickSpeechlet(DynamoDBMapper mapper) {
+  public ChorematickSpeechlet(Dao dao) {
     super();
-    this.mapper = mapper;
+    this.dao = dao;
   }
 
   public void onSessionStarted(final SessionStartedRequest request, final Session session) {
@@ -126,18 +122,7 @@ public class ChorematickSpeechlet implements Speechlet {
       day = intent.getSlot("choreDate").getValue();
     }
 
-    Map<String, String> attributeNames = new HashMap<String, String>();
-    attributeNames.put("#due", "Due");
-
-    Map<String, AttributeValue> attributeValues = new HashMap<String, AttributeValue>();
-    attributeValues.put(":Due", new AttributeValue().withS(day));
-
-    DynamoDBScanExpression scanExpression = new DynamoDBScanExpression()
-            .withFilterExpression("#due = :Due")
-            .withExpressionAttributeNames(attributeNames)
-            .withExpressionAttributeValues(attributeValues);
-
-    PaginatedList<Task> chores =  mapper.scan(Task.class, scanExpression);
+    List<Task> chores = dao.scanDB("Due", day);
 
     PlainTextOutputSpeech speech = new PlainTextOutputSpeech();
 
@@ -162,7 +147,7 @@ public class ChorematickSpeechlet implements Speechlet {
     String day = intent.getSlot("choreDate").getValue();
     String chore = intent.getSlot("chore").getValue();
 
-    Task task = this.mapper.load(Task.class, day, chore);
+    Task task = this.dao.loadFromDB(day, chore);
 
     SimpleCard card = new SimpleCard();
     card.setTitle("Chore Verification");
@@ -176,9 +161,7 @@ public class ChorematickSpeechlet implements Speechlet {
 
   public SpeechletResponse getChoreList() {
 
-    DynamoDBScanExpression scanExpression = new DynamoDBScanExpression();
-
-    List<Task> chores =  mapper.scan(Task.class, scanExpression);
+    List<Task> chores =  this.dao.getAllChores();
 
     String result = "";
 
@@ -187,7 +170,6 @@ public class ChorematickSpeechlet implements Speechlet {
     }
 
     PlainTextOutputSpeech speech = new PlainTextOutputSpeech();
-    System.out.println("result " + result);
     speech.setText(result);
     return SpeechletResponse.newTellResponse(speech);
   }
@@ -206,7 +188,7 @@ public class ChorematickSpeechlet implements Speechlet {
     task.setDate(day);
     task.setChore(chore);
     task.setPassword(password);
-    this.mapper.save(task);
+    this.dao.saveToDB(task);
 
     speech.setText("Very well, I have added a " + chore + " chore for " + day);
 
@@ -247,23 +229,12 @@ public class ChorematickSpeechlet implements Speechlet {
 
     String password = intent.getSlot("password").getValue();
 
-    Map<String, String> attributeNames = new HashMap<String, String>();
-    attributeNames.put("#password", "password");
-
-    Map<String, AttributeValue> attributeValues = new HashMap<String, AttributeValue>();
-    attributeValues.put(":pass", new AttributeValue().withS(password));
-
-    DynamoDBScanExpression scanExpression = new DynamoDBScanExpression()
-    .withFilterExpression("#password = :pass")
-    .withExpressionAttributeNames(attributeNames)
-    .withExpressionAttributeValues(attributeValues);
-
-    PaginatedList<Task> chores =  mapper.scan(Task.class, scanExpression);
+    List<Task> chores = this.dao.scanDB("password", password);
 
     if (chores.size() > 0) {
       Task task = chores.get(0);
       task.setIsComplete(true);
-      this.mapper.save(task);
+      this.dao.saveToDB(task);
       speech.setText("I've confirmed "+ task.getDate() + " " + task.getChore() +" chore is completed.");
     } else {
       speech.setText("Unable to confirm password, please try again.");
@@ -297,18 +268,8 @@ public class ChorematickSpeechlet implements Speechlet {
   }
 
   private int countChoresCompleted(){
-    Map<String, String> attributeNames = new HashMap<String, String>();
-    attributeNames.put("#complete", "Complete");
 
-    Map<String, AttributeValue> attributeValues = new HashMap<String, AttributeValue>();
-    attributeValues.put(":yes", new AttributeValue().withN("1"));
-
-    DynamoDBScanExpression scanExpression = new DynamoDBScanExpression()
-    .withFilterExpression("#complete = :yes")
-    .withExpressionAttributeNames(attributeNames)
-    .withExpressionAttributeValues(attributeValues);
-
-    PaginatedList<Task> completedChores =  mapper.scan(Task.class, scanExpression);
+    List<Task> completedChores =  dao.scanDB("Complete", "1");
 
     return completedChores.size();
   }

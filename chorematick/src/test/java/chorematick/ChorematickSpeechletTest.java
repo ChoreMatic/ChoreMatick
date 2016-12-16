@@ -15,10 +15,7 @@ import com.amazon.speech.ui.SsmlOutputSpeech;
 import com.amazon.speech.ui.Reprompt;
 import com.amazon.speech.ui.SimpleCard;
 import com.amazon.speech.ui.StandardCard;
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
-import com.amazonaws.services.dynamodbv2.datamodeling.PaginatedScanList;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mock;
@@ -28,6 +25,7 @@ import static org.junit.Assert.*;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.*;
 import java.util.Iterator;
+import java.util.List;
 
 public class ChorematickSpeechletTest extends BaseTestCase {
 
@@ -41,23 +39,23 @@ public class ChorematickSpeechletTest extends BaseTestCase {
   @Mock private Slot mockedDateSlot;
   @Mock private Slot mockedChoreSlot;
   @Mock private Slot mockedPasswordSlot;
-  @Mock private DynamoDBMapper mockedMapper;
   @Mock private Task mockedTask;
-  @Mock private PaginatedScanList<Task> mockedPaginatedScanList;
+  @Mock private List<Task> mockedList;
   @Mock private DynamoDBScanExpression mockedExpression;
   @Mock private Iterator mockedIterator;
+  @Mock private Dao mockedDao;
 
   @Before
   public void setup() {
     when(mockedIntentRequest.getIntent()).thenReturn(mockedIntent);
-    speechlet = new ChorematickSpeechlet(mockedMapper);
+    speechlet = new ChorematickSpeechlet(mockedDao);
     speechlet.onSessionStarted(mockedSessionStartedRequest, mockedSession);
   }
 
   @Test
   public void WelcomeResponseTest() {
-    when(mockedMapper.scan(eq(Task.class), any(DynamoDBScanExpression.class))).thenReturn(mockedPaginatedScanList);
-    when(mockedPaginatedScanList.size()).thenReturn(5);
+    when(mockedDao.scanDB(eq("Complete"), any(String.class))).thenReturn(mockedList);
+    when(mockedList.size()).thenReturn(5);
 
     SsmlOutputSpeech speech = new SsmlOutputSpeech();
 
@@ -68,8 +66,8 @@ public class ChorematickSpeechletTest extends BaseTestCase {
 
   @Test
   public void testGiftSuggestion(){
-    when(mockedMapper.scan(eq(Task.class), any(DynamoDBScanExpression.class))).thenReturn(mockedPaginatedScanList);
-    when(mockedPaginatedScanList.size()).thenReturn(11);
+    when(mockedDao.scanDB(eq("Complete"), any(String.class))).thenReturn(mockedList);
+    when(mockedList.size()).thenReturn(11);
 
     SsmlOutputSpeech speech = new SsmlOutputSpeech();
 
@@ -111,9 +109,9 @@ public class ChorematickSpeechletTest extends BaseTestCase {
   public void testgetChoreResponse() {
     when(mockedIntent.getName()).thenReturn("GetChoreIntent");
     when(mockedIntent.getSlot("choreDate")).thenReturn(mockedDateSlot);
-    when(mockedMapper.scan(eq(Task.class), any(DynamoDBScanExpression.class))).thenReturn(mockedPaginatedScanList);
-    when(mockedPaginatedScanList.size()).thenReturn(1);
-    when(mockedPaginatedScanList.get(0)).thenReturn(mockedTask);
+    when(mockedDao.scanDB(eq("Due"), any(String.class))).thenReturn(mockedList);
+    when(mockedList.size()).thenReturn(1);
+    when(mockedList.get(0)).thenReturn(mockedTask);
     when(mockedTask.getChore()).thenReturn("Sweep the chimney. That's right. Sweep the chimney.");
 
 
@@ -130,9 +128,9 @@ public class ChorematickSpeechletTest extends BaseTestCase {
     when(mockedIntent.getName()).thenReturn("GetChoreIntent");
     when(mockedIntent.getSlot("choreDate")).thenReturn(mockedDateSlot);
     when(mockedDateSlot.getValue()).thenReturn(null);
-    when(mockedMapper.scan(eq(Task.class), any(DynamoDBScanExpression.class))).thenReturn(mockedPaginatedScanList);
-    when(mockedPaginatedScanList.size()).thenReturn(1);
-    when(mockedPaginatedScanList.get(0)).thenReturn(mockedTask);
+    when(mockedDao.scanDB(eq("Due"), any(String.class))).thenReturn(mockedList);
+    when(mockedList.size()).thenReturn(1);
+    when(mockedList.get(0)).thenReturn(mockedTask);
     when(mockedTask.getChore()).thenReturn("Sweep the chimney. That's right. Sweep the chimney.");
 
 
@@ -148,16 +146,16 @@ public class ChorematickSpeechletTest extends BaseTestCase {
   public void testConfirmChoreResponse(){
     when(mockedIntent.getName()).thenReturn("ConfirmChoreIntent");
     when(mockedIntent.getSlot("password")).thenReturn(mockedPasswordSlot);
-    when(mockedMapper.scan(eq(Task.class), any(DynamoDBScanExpression.class))).thenReturn(mockedPaginatedScanList);
-    when(mockedPaginatedScanList.size()).thenReturn(1);
-    when(mockedPaginatedScanList.get(0)).thenReturn(mockedTask);
+    when(mockedPasswordSlot.getValue()).thenReturn("1234");
+    when(mockedDao.scanDB(eq("password"), any(String.class))).thenReturn(mockedList);
+    when(mockedList.size()).thenReturn(1);
+    when(mockedList.get(0)).thenReturn(mockedTask);
     when(mockedTask.getDate()).thenReturn("12-12-2016");
     when(mockedTask.getChore()).thenReturn("Shear the sheep");
 
     SpeechletResponse response = speechlet.onIntent(mockedIntentRequest, mockedSession);
-    verify(mockedMapper).scan(eq(Task.class), any(DynamoDBScanExpression.class));
     verify(mockedTask).setIsComplete(true);
-    verify(mockedMapper).save(any(Task.class));
+    verify(mockedDao).saveToDB(any(Task.class));
     assertThat(((PlainTextOutputSpeech) response.getOutputSpeech()).getText(), equalTo("I've confirmed 12-12-2016 Shear the sheep chore is completed."));
   }
 
@@ -165,11 +163,11 @@ public class ChorematickSpeechletTest extends BaseTestCase {
   public void testUnableToConfirmChoreResponse(){
     when(mockedIntent.getName()).thenReturn("ConfirmChoreIntent");
     when(mockedIntent.getSlot("password")).thenReturn(mockedPasswordSlot);
-    when(mockedMapper.scan(eq(Task.class), any(DynamoDBScanExpression.class))).thenReturn(mockedPaginatedScanList);
-    when(mockedPaginatedScanList.size()).thenReturn(0);
+    when(mockedPasswordSlot.getValue()).thenReturn("1234");
+    when(mockedDao.scanDB(eq("password"), any(String.class))).thenReturn(mockedList);
+    when(mockedList.size()).thenReturn(0);
 
     SpeechletResponse response = speechlet.onIntent(mockedIntentRequest, mockedSession);
-    verify(mockedMapper).scan(eq(Task.class), any(DynamoDBScanExpression.class));
     assertThat(((PlainTextOutputSpeech) response.getOutputSpeech()).getText(), equalTo("Unable to confirm password, please try again."));
   }
 
@@ -183,7 +181,7 @@ public class ChorematickSpeechletTest extends BaseTestCase {
 
     SpeechletResponse response = speechlet.onIntent(mockedIntentRequest, mockedSession);
     SimpleCard card = (SimpleCard) response.getCard();
-    verify(mockedMapper).save(any(Task.class));
+    verify(mockedDao).saveToDB(any(Task.class));
     assertThat(((PlainTextOutputSpeech) response.getOutputSpeech()).getText(), equalTo("Very well, I have added a Shear the sheep chore for 02-03-2016"));
     assertThat(card.getTitle(), equalTo("02-03-2016 " + "Shear the sheep"));
   }
@@ -195,7 +193,7 @@ public class ChorematickSpeechletTest extends BaseTestCase {
     when(mockedDateSlot.getValue()).thenReturn("02-03-2016");
     when(mockedIntent.getSlot("chore")).thenReturn(mockedChoreSlot);
     when(mockedChoreSlot.getValue()).thenReturn("Shear the sheep");
-    when(mockedMapper.load(eq(Task.class),eq("02-03-2016"),eq("Shear the sheep"))).thenReturn(mockedTask);
+    when(mockedDao.loadFromDB("02-03-2016","Shear the sheep")).thenReturn(mockedTask);
     when(mockedTask.getPassword()).thenReturn("1234");
 
     SpeechletResponse response = speechlet.onIntent(mockedIntentRequest, mockedSession);
@@ -209,40 +207,35 @@ public class ChorematickSpeechletTest extends BaseTestCase {
   @Test
   public void testGetChoreList(){
     when(mockedIntent.getName()).thenReturn("GetChoreListIntent");
-    when(mockedMapper.scan(eq(Task.class), any(DynamoDBScanExpression.class))).thenReturn(mockedPaginatedScanList);
-    when(mockedPaginatedScanList.iterator()).thenReturn(mockedIterator);
+    when(mockedDao.getAllChores()).thenReturn(mockedList);
+    when(mockedList.iterator()).thenReturn(mockedIterator);
     when(mockedIterator.hasNext()).thenReturn(true).thenReturn(false);
     when(mockedIterator.next()).thenReturn(mockedTask);
     when(mockedTask.getChore()).thenReturn("Clean the gutters");
 
     SpeechletResponse response = speechlet.onIntent(mockedIntentRequest, mockedSession);
 
-    verify(mockedMapper).scan(eq(Task.class), any(DynamoDBScanExpression.class));
     assertThat(((PlainTextOutputSpeech) response.getOutputSpeech()).getText(), equalTo("Clean the gutters, "));
   }
-
 
   @Test
   public void testEasterEggResponse() {
     when(mockedIntent.getName()).thenReturn("ChorematickIntent");
-
 
     SpeechletResponse response = speechlet.onIntent(mockedIntentRequest, mockedSession);
 
     assertThat(((PlainTextOutputSpeech) response.getOutputSpeech()).getText(), equalTo("Go stand in the corner and think about what you've done."));
   }
 
-
   @Test
   public void testGetNumberOfCompletedChoresResponse() {
     when(mockedIntent.getName()).thenReturn("NumberOfCompletedChoresIntent");
-    when(mockedMapper.scan(eq(Task.class), any(DynamoDBScanExpression.class))).thenReturn(mockedPaginatedScanList);
-    when(mockedPaginatedScanList.size()).thenReturn(5);
+    when(mockedDao.scanDB(eq("Complete"), any(String.class))).thenReturn(mockedList);
+    when(mockedList.size()).thenReturn(5);
 
     SpeechletResponse response = speechlet.onIntent(mockedIntentRequest, mockedSession);
 
-    verify(mockedMapper).scan(eq(Task.class),any(DynamoDBScanExpression.class));
-    verify(mockedPaginatedScanList).size();
+    verify(mockedList).size();
 
     assertThat(((PlainTextOutputSpeech) response.getOutputSpeech()).getText(), equalTo("There are 5 completed chores."));
   }

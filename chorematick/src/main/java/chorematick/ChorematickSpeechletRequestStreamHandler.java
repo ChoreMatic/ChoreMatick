@@ -15,9 +15,10 @@ public final class ChorematickSpeechletRequestStreamHandler extends SpeechletReq
 
     private static final AmazonDynamoDBClient client = new AmazonDynamoDBClient();
     private static final DynamoDBMapper mapper = new DynamoDBMapper(client);
+    private static final Dao dao = new Dao(mapper);
 
     public ChorematickSpeechletRequestStreamHandler() {
-        super(new ChorematickSpeechlet(mapper), supportedApplicationIds);
+        super(new ChorematickSpeechlet(dao), supportedApplicationIds);
 
     }
 }
